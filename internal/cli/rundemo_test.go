@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"net/http"
 	"strings"
 	"testing"
 )
@@ -32,16 +33,31 @@ func TestRunDemoSuccessWithDefaults(t *testing.T) {
 	if api.lastAuth != "Bearer test-token" {
 		t.Fatalf("expected bearer auth header, got %q", api.lastAuth)
 	}
+	if api.lastMethod != http.MethodPost || api.lastPath != "/graphql" {
+		t.Fatalf("expected authenticated POST to /graphql, got %s %s", api.lastMethod, api.lastPath)
+	}
 
 	var payload struct {
+		Query     string         `json:"query"`
 		Variables map[string]any `json:"variables"`
 	}
 	if err := json.Unmarshal([]byte(api.lastBody), &payload); err != nil {
 		t.Fatalf("graphql request body is not JSON: %v", err)
 	}
+	if !strings.Contains(payload.Query, "mutation StartAudioDemo") ||
+		!strings.Contains(payload.Query, "startAudioDemo") {
+		t.Fatalf("expected startAudioDemo mutation, got %q", payload.Query)
+	}
 	vars := payload.Variables
 	if vars["chatroomName"] != "Shooting Incident - English" {
 		t.Fatalf("expected default call type name, got %v", vars["chatroomName"])
+	}
+	if vars["callerAudioUrl"] != "https://static.cdn.prepared911.dev/audio-demos/shooting-incident-english-caller.raw" ||
+		vars["dispatcherAudioUrl"] != "https://static.cdn.prepared911.dev/audio-demos/shooting-incident-english-dispatcher.raw" {
+		t.Fatalf("expected default call type audio URLs, got %v", vars)
+	}
+	if vars["languageCode"] != "en-US" {
+		t.Fatalf("expected default language code, got %v", vars["languageCode"])
 	}
 	if vars["phoneNumber"] != "+18179731331" {
 		t.Fatalf("expected default E.164 phone, got %v", vars["phoneNumber"])

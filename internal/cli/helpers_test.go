@@ -44,6 +44,8 @@ type apiFake struct {
 	healthy        bool
 	graphqlHandler func(w http.ResponseWriter, r *http.Request)
 	graphqlCalls   int
+	lastMethod     string
+	lastPath       string
 	lastAuth       string
 	lastBody       string
 }
@@ -67,6 +69,8 @@ func (f *apiFake) handler() http.Handler {
 	mux.HandleFunc("/graphql", func(w http.ResponseWriter, r *http.Request) {
 		f.mu.Lock()
 		f.graphqlCalls++
+		f.lastMethod = r.Method
+		f.lastPath = r.URL.Path
 		f.lastAuth = r.Header.Get("Authorization")
 		body, _ := io.ReadAll(r.Body)
 		f.lastBody = string(body)
