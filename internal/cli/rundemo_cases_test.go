@@ -371,6 +371,31 @@ func TestRunDemoUnhealthyAPI(t *testing.T) {
 	}
 }
 
+func TestRunDemoUnreachableAPI(t *testing.T) {
+	env := baseEnv("http://127.0.0.1:1", startLocationFake(t, 29.0, -95.0))
+	res := runCommand(t, []string{"run-demo"}, env)
+	requireFailure(t, res)
+	if !strings.Contains(res.stderr, "responder start-app") {
+		t.Fatalf("expected start-app hint, got:\n%s", res.stderr)
+	}
+}
+
+func TestRunDemoHTTPError(t *testing.T) {
+	api := newAPIFake(t)
+	api.graphqlHandler = func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"invalid token"}`))
+	}
+	apiURL := api.start(t)
+	lookupURL := startLocationFake(t, 29.0, -95.0)
+
+	res := runCommand(t, []string{"run-demo"}, baseEnv(apiURL, lookupURL))
+	requireFailure(t, res)
+	if !strings.Contains(res.stderr, "401") || !strings.Contains(res.stderr, "invalid token") {
+		t.Fatalf("expected HTTP error surfaced, got:\n%s", res.stderr)
+	}
+}
+
 func TestRunDemoGraphQLError(t *testing.T) {
 	api := newAPIFake(t)
 	api.graphqlHandler = func(w http.ResponseWriter, r *http.Request) {

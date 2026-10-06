@@ -48,7 +48,7 @@ func (c *Client) CheckHealth(ctx context.Context) error {
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
-		return err
+		return fmt.Errorf("API at %s is not reachable (%v); run `responder start-app` to bring up the local stack", c.BaseURL, err)
 	}
 	defer resp.Body.Close()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 4<<10))
