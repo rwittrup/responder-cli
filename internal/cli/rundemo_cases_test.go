@@ -78,6 +78,52 @@ func TestRunDemoEnvOverridesDefault(t *testing.T) {
 	}
 }
 
+func TestRunDemoCountryFlagOverridesEnv(t *testing.T) {
+	api := newAPIFake(t)
+	apiURL := api.start(t)
+	lookupURL := startLocationFake(t, 29.0, -95.0)
+
+	env := baseEnv(apiURL, lookupURL)
+	env["RESPONDER_COUNTRY"] = "GB"
+	res := runCommand(t, []string{
+		"run-demo",
+		"--country", "US",
+		"--phone", "8179731331",
+	}, env)
+	requireSuccess(t, res)
+
+	if got := graphqlVars(t, api)["phoneNumber"]; got != "+18179731331" {
+		t.Fatalf("expected flag country to win, got %v", got)
+	}
+}
+
+func TestRunDemoFlagsOverrideBaseURLEnvironment(t *testing.T) {
+	envAPI := newAPIFake(t)
+	envAPIURL := envAPI.start(t)
+	flagAPI := newAPIFake(t)
+	flagAPIURL := flagAPI.start(t)
+	lookupURL := startLocationFake(t, 29.0, -95.0)
+
+	env := baseEnv(envAPIURL, lookupURL)
+	env["RESPONDER_PORTAL_URL"] = "http://env.portal:3002"
+	res := runCommand(t, []string{
+		"run-demo",
+		"--api-url", flagAPIURL,
+		"--portal-url", "http://flag.portal:3002",
+	}, env)
+	requireSuccess(t, res)
+
+	if got := flagAPI.calls(); got != 1 {
+		t.Fatalf("expected the flag API URL to receive one GraphQL call, got %d", got)
+	}
+	if got := envAPI.calls(); got != 0 {
+		t.Fatalf("expected the environment API URL to receive no GraphQL calls, got %d", got)
+	}
+	if !strings.Contains(res.stdout, "http://flag.portal:3002/chatroom/chatroom-123") {
+		t.Fatalf("expected the flag portal URL in stdout, got:\n%s", res.stdout)
+	}
+}
+
 func TestRunDemoPhoneNormalization(t *testing.T) {
 	cases := []struct{ in, want string }{
 		{"(817) 973-1331", "+18179731331"},
@@ -327,6 +373,89 @@ func TestRunDemoSendsCallTypeAudioURLs(t *testing.T) {
 	}
 	if !strings.Contains(vars["callerAudioUrl"].(string), "vietnamese-shooting-caller") {
 		t.Fatalf("expected vietnamese caller audio, got %v", vars["callerAudioUrl"])
+	}
+}
+
+func TestRunDemoSendsEverySupportedCallType(t *testing.T) {
+	cases := []struct {
+		name       string
+		callerURL  string
+		dispatcher string
+		language   string
+	}{
+		{
+			name:       "Shooting Incident - English",
+			callerURL:  "https://static.cdn.prepared911.dev/audio-demos/shooting-incident-english-caller.raw",
+			dispatcher: "https://static.cdn.prepared911.dev/audio-demos/shooting-incident-english-dispatcher.raw",
+			language:   "en-US",
+		},
+		{
+			name:       "Medical Emergency - School",
+			callerURL:  "https://static.cdn.prepared911.dev/audio-demos/shooting-incident-english-caller.raw",
+			dispatcher: "https://static.cdn.prepared911.dev/audio-demos/shooting-incident-english-dispatcher.raw",
+			language:   "en-US",
+		},
+		{
+			name:       "House Fire - English",
+			callerURL:  "https://static.cdn.prepared911.dev/audio-demos/house-fire-english-caller.raw",
+			dispatcher: "https://static.cdn.prepared911.dev/audio-demos/house-fire-english-dispatcher.raw",
+			language:   "en-US",
+		},
+		{
+			name:       "Home Invasion - English",
+			callerURL:  "https://static.cdn.prepared911.dev/audio-demos/home-invasion-english-caller.raw",
+			dispatcher: "https://static.cdn.prepared911.dev/audio-demos/home-invasion-english-dispatcher.raw",
+			language:   "en-US",
+		},
+		{
+			name:       "Shooting Incident - Vietnamese",
+			callerURL:  "https://static.cdn.prepared911.dev/audio-demos/vietnamese-shooting-caller-take1-trimmed.raw",
+			dispatcher: "https://static.cdn.prepared911.dev/audio-demos/vietnamese-shooting-dispatcher-take1.raw",
+			language:   "vi",
+		},
+		{
+			name:       "Prepared Translator - Spanish",
+			callerURL:  "https://static.cdn.prepared911.dev/audio-demos/spanish-translator-caller.raw",
+			dispatcher: "https://static.cdn.prepared911.dev/audio-demos/spanish-translator-dispatcher.raw",
+			language:   "es",
+		},
+		{
+			name:       "Crime In-Progress - Mayo Blvd",
+			callerURL:  "https://static.cdn.prepared911.dev/audio-demos/axon-hq-gsoc-caller.raw",
+			dispatcher: "https://static.cdn.prepared911.dev/audio-demos/axon-hq-gsoc-dispatcher.raw",
+			language:   "en-US",
+		},
+		{
+			name:       "Axon Arena",
+			callerURL:  "https://static.cdn.prepared911.dev/audio-demos/axon-arena-caller.raw",
+			dispatcher: "https://static.cdn.prepared911.dev/audio-demos/axon-arena-dispatcher.raw",
+			language:   "en-US",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			api := newAPIFake(t)
+			apiURL := api.start(t)
+			lookupURL := startLocationFake(t, 29.0, -95.0)
+
+			res := runCommand(t, []string{"run-demo", "--call-type", tc.name}, baseEnv(apiURL, lookupURL))
+			requireSuccess(t, res)
+
+			vars := graphqlVars(t, api)
+			if vars["chatroomName"] != tc.name {
+				t.Fatalf("expected call type name %q, got %v", tc.name, vars["chatroomName"])
+			}
+			if vars["callerAudioUrl"] != tc.callerURL {
+				t.Fatalf("expected caller audio URL %q, got %v", tc.callerURL, vars["callerAudioUrl"])
+			}
+			if vars["dispatcherAudioUrl"] != tc.dispatcher {
+				t.Fatalf("expected dispatcher audio URL %q, got %v", tc.dispatcher, vars["dispatcherAudioUrl"])
+			}
+			if vars["languageCode"] != tc.language {
+				t.Fatalf("expected language code %q, got %v", tc.language, vars["languageCode"])
+			}
+		})
 	}
 }
 
