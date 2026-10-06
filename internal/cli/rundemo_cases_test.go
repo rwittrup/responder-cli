@@ -243,9 +243,8 @@ func TestRunDemoExplicitLocationSkipsLookup(t *testing.T) {
 func TestRunDemoEnvLocation(t *testing.T) {
 	api := newAPIFake(t)
 	apiURL := api.start(t)
-	lookupURL := startLocationFake(t, 29.0, -95.0)
 
-	env := baseEnv(apiURL, lookupURL)
+	env := baseEnv(apiURL, "http://127.0.0.1:1/unreachable")
 	env["RESPONDER_LAT"] = "40.7"
 	env["RESPONDER_LNG"] = "-74.0"
 	res := runCommand(t, []string{"run-demo"}, env)
@@ -286,6 +285,28 @@ func TestRunDemoLookupFailure(t *testing.T) {
 	}
 	if got := api.calls(); got != 0 {
 		t.Fatalf("expected no GraphQL call after lookup failure, got %d", got)
+	}
+}
+
+func TestRunDemoMalformedLookup(t *testing.T) {
+	api := newAPIFake(t)
+	apiURL := api.start(t)
+	malformed := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"success"`))
+	}))
+	t.Cleanup(malformed.Close)
+
+	env := baseEnv(apiURL, malformed.URL)
+	delete(env, "RESPONDER_LAT")
+	delete(env, "RESPONDER_LNG")
+	res := runCommand(t, []string{"run-demo"}, env)
+	requireFailure(t, res)
+	if !strings.Contains(res.stderr, "--lat") || !strings.Contains(res.stderr, "--lng") {
+		t.Fatalf("expected malformed-location error to mention --lat/--lng, got:\n%s", res.stderr)
+	}
+	if got := api.calls(); got != 0 {
+		t.Fatalf("expected no GraphQL call after malformed lookup, got %d", got)
 	}
 }
 
