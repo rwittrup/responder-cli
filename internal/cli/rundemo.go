@@ -97,9 +97,6 @@ func runDemo(cmd *cobra.Command, opts runDemoOptions) error {
 	if v, ok := envOrUnset("RESPONDER_USER_EMAIL", changed("user-email")); ok {
 		opts.userEmail = v
 	}
-	if strings.TrimSpace(opts.userEmail) == "" {
-		opts.userEmail = token.DefaultUserEmail()
-	}
 
 	ct, err := calltypes.Lookup(strings.TrimSpace(opts.callType))
 	if err != nil {
@@ -113,18 +110,18 @@ func runDemo(cmd *cobra.Command, opts runDemoOptions) error {
 	createTimeout := parseDurationEnv("RESPONDER_CREATE_TIMEOUT", defaultCreateTimeout)
 	client := api.NewClient(opts.apiURL, "", createTimeout)
 
-	healthCtx, cancelHealth := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancelHealth()
-	if err := client.CheckHealth(healthCtx); err != nil {
-		return err
-	}
-
 	checkoutDir := expandHome(opts.checkoutDir)
 	authToken, err := token.Resolve(opts.authToken, checkoutDir, opts.userEmail)
 	if err != nil {
 		return err
 	}
 	client.Token = authToken
+
+	healthCtx, cancelHealth := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancelHealth()
+	if err := client.CheckHealth(healthCtx); err != nil {
+		return err
+	}
 
 	lat, lng, err := resolveLatLng(cmd, changed)
 	if err != nil {

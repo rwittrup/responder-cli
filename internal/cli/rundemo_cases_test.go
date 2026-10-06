@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os/exec"
 	"strings"
 	"testing"
 	"time"
@@ -224,6 +225,50 @@ func TestRunDemoNoTokenMessage(t *testing.T) {
 	}
 	if got := api.calls(); got != 0 {
 		t.Fatalf("expected no GraphQL call without a token, got %d", got)
+	}
+}
+
+func TestRunDemoNoTokenMessageBeforeHealthCheck(t *testing.T) {
+	api := newAPIFake(t)
+	api.healthy = false
+	apiURL := api.start(t)
+	checkout := checkoutWithToken(t, "")
+
+	res := runCommand(t, []string{"run-demo"}, map[string]string{
+		"RESPONDER_API_URL":    apiURL,
+		"RESPONDER_TOKEN":      "",
+		"PREPARED911_DIR":      checkout,
+		"RESPONDER_USER_EMAIL": "dev@example.com",
+	})
+	requireFailure(t, res)
+	for _, want := range []string{"no auth token", "graphiql-token", "dev@example.com"} {
+		if !strings.Contains(strings.ToLower(res.stderr), strings.ToLower(want)) {
+			t.Fatalf("expected stderr to mention %q, got:\n%s", want, res.stderr)
+		}
+	}
+	if got := api.calls(); got != 0 {
+		t.Fatalf("expected no GraphQL call without a token, got %d", got)
+	}
+}
+
+func TestRunDemoNoTokenMessageUsesGitEmail(t *testing.T) {
+	email, err := exec.Command("git", "config", "user.email").Output()
+	if err != nil || strings.TrimSpace(string(email)) == "" {
+		t.Skip("git user.email is not configured")
+	}
+
+	api := newAPIFake(t)
+	apiURL := api.start(t)
+	checkout := checkoutWithToken(t, "")
+	res := runCommand(t, []string{"run-demo"}, map[string]string{
+		"RESPONDER_API_URL":    apiURL,
+		"RESPONDER_TOKEN":      "",
+		"RESPONDER_USER_EMAIL": "",
+		"PREPARED911_DIR":      checkout,
+	})
+	requireFailure(t, res)
+	if want := strings.TrimSpace(string(email)); !strings.Contains(res.stderr, want) {
+		t.Fatalf("expected stderr to mention git user.email %q, got:\n%s", want, res.stderr)
 	}
 }
 
