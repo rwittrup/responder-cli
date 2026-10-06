@@ -60,7 +60,7 @@ then default.`,
 	f := cmd.Flags()
 	f.StringVar(&opts.phone, "phone", defaultPhone, "caller phone number (env RESPONDER_CALLER_PHONE)")
 	f.StringVar(&opts.country, "country", defaultCountry, "country for numbers entered without a + (env RESPONDER_COUNTRY)")
-	f.StringVar(&opts.callType, "call-type", calltypes.DefaultName, "call type scenario (env RESPONDER_CALL_TYPE)")
+	f.StringVar(&opts.callType, "call-type", calltypes.DefaultName, "call type to run (env RESPONDER_CALL_TYPE)")
 	f.Float64Var(&opts.lat, "lat", 0, "demo latitude; requires --lng (env RESPONDER_LAT)")
 	f.Float64Var(&opts.lng, "lng", 0, "demo longitude; requires --lat (env RESPONDER_LNG)")
 	f.StringVar(&opts.apiURL, "api-url", defaultAPIURL, "prepared911 API base URL (env RESPONDER_API_URL)")
@@ -96,6 +96,9 @@ func runDemo(cmd *cobra.Command, opts runDemoOptions) error {
 	}
 	if v, ok := envOrUnset("RESPONDER_USER_EMAIL", changed("user-email")); ok {
 		opts.userEmail = v
+	}
+	if strings.TrimSpace(opts.userEmail) == "" {
+		opts.userEmail = token.DefaultUserEmail()
 	}
 
 	ct, err := calltypes.Lookup(strings.TrimSpace(opts.callType))

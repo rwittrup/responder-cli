@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// CallType is a built-in Audio Demo scenario.
+// CallType is a built-in Audio Demo call type.
 type CallType struct {
 	Name                   string
 	CallerAudioURL         string

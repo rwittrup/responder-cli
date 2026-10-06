@@ -24,10 +24,9 @@ const GraphQLPath = "/graphql"
 
 // Client talks to one API base URL.
 type Client struct {
-	BaseURL    string
-	Token      string
-	HTTP       *http.Client
-	APIBaseURL string
+	BaseURL string
+	Token   string
+	HTTP    *http.Client
 }
 
 // NewClient builds a client with the given per-request timeout.

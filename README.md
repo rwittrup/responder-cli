@@ -47,7 +47,7 @@ responder run-demo
 # Incident created: abc123
 # Portal URL: http://localhost:3002/chatroom/abc123
 
-# Try a different scenario at a fixed location.
+# Try a different call type at a fixed location.
 responder run-demo --call-type "House Fire - English" \
   --lat 40.8017396 --lng -73.7379377
 ```
